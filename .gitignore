@@ -1,0 +1,7 @@
+# Secrets / keys - never commit these
+*.pem
+*.key
+private_key*
+
+# Local debug logs
+logs/

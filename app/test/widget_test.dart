@@ -1,0 +1,94 @@
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:reellock/main.dart';
+
+void main() {
+  const controlChannel = MethodChannel('reellock/control');
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(controlChannel, null);
+  });
+
+  testWidgets('with no commitment yet, the app opens on the setup wizard', (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(controlChannel, (call) async {
+      if (call.method == 'getSnapshot') {
+        return {
+          'status': 'SETUP',
+          'config': null,
+          'activatedAtEpochMillis': null,
+          'deadlineEpochMillis': null,
+          'nowEpochMillis': 1700000000000,
+          'authorizedRecovery': false,
+          'clockAnomalyDetected': false,
+        };
+      }
+      return null;
+    });
+
+    await tester.pumpWidget(const ReelLockApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set up ReelLock'), findsOneWidget);
+    // The button is below the fold in a ListView (Slivers only build what's
+    // visible), so scroll it into view before asserting on it.
+    await tester.scrollUntilVisible(find.text('Review and activate'), 300, scrollable: find.byType(Scrollable));
+    await tester.pumpAndSettle();
+    expect(find.text('Review and activate'), findsOneWidget);
+  });
+
+  testWidgets('with an active commitment, the app opens on the dashboard', (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(controlChannel, (call) async {
+      switch (call.method) {
+        case 'getSnapshot':
+          return {
+            'status': 'ACTIVE',
+            'config': {
+              'version': 1,
+              'reelsAllowanceSeconds': 1800,
+              'windowSeconds': 18000,
+              'commitmentDays': 30,
+              'recoveryMode': 'TRUSTED_PERSON',
+              'enforcementMode': 'ACCESSIBILITY',
+              'targetPackage': 'com.instagram.android',
+              'blockUnknownScreens': false,
+              'allowRecoveryDuringLock': true,
+            },
+            'activatedAtEpochMillis': 1700000000000,
+            'deadlineEpochMillis': 1702592000000,
+            'nowEpochMillis': 1700000000000,
+            'authorizedRecovery': false,
+            'clockAnomalyDetected': false,
+          };
+        case 'getUsageSummary':
+          return {
+            'remainingSeconds': 1200,
+            'usedSeconds': 600,
+            'allowanceSeconds': 1800,
+            'windowSeconds': 18000,
+            'lowConfidenceSecondsCounted': 0,
+          };
+        case 'getPermissionStatus':
+          return {
+            'accessibilityServiceEnabled': true,
+            'notificationsEnabled': true,
+            'isDeviceOwner': false,
+            'protectionLevel': 'ACTIVE',
+          };
+        default:
+          return null;
+      }
+    });
+
+    await tester.pumpWidget(const ReelLockApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('ReelLock'), findsOneWidget);
+    expect(find.text('Active - locked'), findsOneWidget);
+    expect(find.textContaining('min remaining'), findsOneWidget);
+  });
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minimal policy set for ReelLockDeviceAdminReceiver (need.md section 8).
+  Deliberately empty: ReelLock never asks for password/wipe/camera-disable
+  policies. The only capabilities it relies on (setUninstallBlocked,
+  DISALLOW_SAFE_BOOT user restriction) are gated by device-owner status
+  itself, not by entries here. DevicePolicyController always checks
+  isDeviceOwnerApp() before calling them, so plain device-admin activation
+  (without owner provisioning) grants this app nothing extra.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies />
+</device-admin>

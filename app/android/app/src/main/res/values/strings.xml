@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Play Console Accessibility API disclosure (need.md section 10): this
+      description must truthfully state ReelLock is an automation/self-control
+      tool, not an accessibility service for users with disabilities.
+    -->
+    <string name="accessibility_service_description">ReelLock uses this accessibility permission to detect when Instagram shows its Reels viewer, so it can enforce the Reels time limit you configured. It is not an accessibility tool for users with disabilities. It only inspects screens belonging to the Instagram app and never reads message content.</string>
+</resources>
