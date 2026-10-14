@@ -1,10 +1,15 @@
 package com.reellock.reellock
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.reellock.reellock.bridge.toMap
 import com.reellock.reellock.bridge.configFromMap
 import com.reellock.reellock.commitment.RecoveryAction
@@ -33,6 +38,8 @@ class MainActivity : FlutterActivity() {
     private var eventSink: EventChannel.EventSink? = null
 
     private val app: ReelLockApplication get() = application as ReelLockApplication
+
+    private var pendingNotificationPermissionResult: MethodChannel.Result? = null
 
     // SurfaceView (Flutter's default render mode) renders solid black on some
     // emulator/virtual-GPU compositors - the app runs fine underneath (verified
@@ -180,6 +187,53 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
 
+                    "requestNotificationPermission" -> {
+                        requestNotificationPermission(result)
+                    }
+
+                    "requestIgnoreBatteryOptimizations" -> {
+                        // Shows the system's own "Allow ReelLock to run in the
+                        // background?" dialog - the real mechanism behind
+                        // "ask for background run". No direct success/failure
+                        // callback from this intent; the caller re-checks
+                        // getPermissionStatus().batteryOptimizationIgnored
+                        // after returning (PermissionSetupScreen already does
+                        // this on app resume).
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                        result.success(null)
+                    }
+
+                    "openMiuiAutostartSettings" -> {
+                        // No public Android API grants or even queries MIUI's
+                        // separate "Autostart" switch - this is a best-effort
+                        // deep link into MIUI's own settings screen. Falls
+                        // back to the generic app-details page if the
+                        // component isn't present (non-MIUI devices, or MIUI
+                        // versions that moved/renamed it).
+                        val miuiIntent = Intent().apply {
+                            component = android.content.ComponentName(
+                                "com.miui.securitycenter",
+                                "com.miui.permcenter.autostart.AutoStartManagementActivity",
+                            )
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        try {
+                            startActivity(miuiIntent)
+                        } catch (e: Exception) {
+                            startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", packageName, null)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                },
+                            )
+                        }
+                        result.success(null)
+                    }
+
                     "openAppSettings" -> {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", packageName, null)
@@ -195,6 +249,36 @@ class MainActivity : FlutterActivity() {
                 result.error("REELLOCK_ERROR", e.message, null)
             }
         }
+    }
+
+    /**
+     * need.md R9: ask for what's needed up front rather than silently
+     * degrading. Notifications aren't enforcement-critical (the foreground
+     * service keeps running either way - see ReelLockForegroundService) but
+     * the setup flow asks anyway so the user sees the "ReelLock is active"
+     * status notification rather than wondering why it's missing.
+     */
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.success(true)
+            return
+        }
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            result.success(true)
+            return
+        }
+        pendingNotificationPermissionResult = result
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST_CODE)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != NOTIFICATION_PERMISSION_REQUEST_CODE) return
+        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        pendingNotificationPermissionResult?.success(granted)
+        pendingNotificationPermissionResult = null
     }
 
     private fun updateResultToMap(r: UpdateResult): Map<String, Any?> = when (r) {
@@ -223,5 +307,9 @@ class MainActivity : FlutterActivity() {
         RecoveryApprovalResult.AlreadyResolved -> mapOf("outcome" to "alreadyResolved")
         RecoveryApprovalResult.InvalidSignature -> mapOf("outcome" to "invalidSignature")
         RecoveryApprovalResult.NoTrustedPersonKeyConfigured -> mapOf("outcome" to "noTrustedPersonKeyConfigured")
+    }
+
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
     }
 }

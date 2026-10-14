@@ -54,7 +54,9 @@ fun RemainingBudget.toMap(): Map<String, Any?> = mapOf(
 fun PermissionStatus.toMap(): Map<String, Any?> = mapOf(
     "accessibilityServiceEnabled" to accessibilityServiceEnabled,
     "notificationsEnabled" to notificationsEnabled,
+    "batteryOptimizationIgnored" to batteryOptimizationIgnored,
     "isDeviceOwner" to isDeviceOwner,
+    "isMiui" to isMiui,
     "protectionLevel" to protectionLevel.name,
 )
 

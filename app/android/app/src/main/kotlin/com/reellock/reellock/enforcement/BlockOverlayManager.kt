@@ -3,6 +3,7 @@ package com.reellock.reellock.enforcement
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -11,14 +12,17 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.reellock.reellock.R
 import kotlin.math.max
 
 /**
  * Shows a block overlay using TYPE_ACCESSIBILITY_OVERLAY, which an
  * AccessibilityService may add without the SYSTEM_ALERT_WINDOW permission
  * (need.md section 5: "show an accessibility overlay ... when the budget is
- * exhausted"). Built programmatically rather than from a layout resource to
- * keep this self-contained.
+ * exhausted"). A bottom sheet - anchored to the bottom edge, roughly half
+ * the screen tall - rather than a full-screen blackout. Built
+ * programmatically (styled via drawable resources) rather than from a
+ * layout resource, to keep this self-contained.
  *
  * EnforcementManager.onClassification runs on a background coroutine
  * dispatcher (DB/crypto work shouldn't block the UI thread), but
@@ -54,55 +58,78 @@ class BlockOverlayManager(private val service: AccessibilityService) {
             return
         }
 
+        val density = service.resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+
         val root = LinearLayout(service).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.argb(235, 10, 10, 10))
-            setPadding(48, 48, 48, 48)
+            setBackgroundResource(R.drawable.bg_block_overlay_sheet)
+            setPadding(dp(28), dp(16), dp(28), dp(28))
+        }
+
+        val handle = android.view.View(service).apply {
+            setBackgroundResource(R.drawable.bg_block_overlay_handle)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(4)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(20)
+            }
         }
 
         val title = TextView(service).apply {
             text = "Reels is locked for now"
             setTextColor(Color.WHITE)
-            textSize = 22f
-            gravity = Gravity.CENTER
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
         }
         val body = TextView(service).apply {
             tag = TAG_BODY
-            setTextColor(Color.LTGRAY)
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 24)
+            setTextColor(Color.argb(200, 255, 255, 255))
+            textSize = 15f
+            setLineSpacing(dp(4).toFloat(), 1f)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(10)
+                bottomMargin = dp(24)
+            }
         }
-        val backButton = Button(service).apply {
-            text = "Go to home screen"
+        val dismissButton = Button(service).apply {
+            text = "Got it"
+            setAllCaps(false)
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
+            background = resources.getDrawable(R.drawable.bg_block_overlay_button, service.theme)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52),
+            )
             setOnClickListener {
-                // GLOBAL_ACTION_BACK was unreliable: Reels' full-screen pager
-                // often has no back stack to pop. HOME always leaves Instagram.
-                service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-                // Don't wait on the next classification tick to notice the
-                // screen changed - dismiss immediately so the button always
-                // visibly does something. If the user reopens Instagram
-                // straight back into blocked Reels, EnforcementManager shows
-                // (and re-homes) it again on the very next event.
+                // Just closes the sheet - it doesn't navigate anywhere.
+                // EnforcementManager already moved the user off Reels (see
+                // InstagramNavigation) when this first showed; if they're
+                // still on a blocked Reels screen, the very next
+                // classification event re-shows it.
                 dismissOnMainThread()
             }
         }
 
+        root.addView(handle)
         root.addView(title)
         root.addView(body)
-        root.addView(backButton)
+        root.addView(dismissButton)
         overlayView = root
         updateText(remainingDays, deadlineText)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            service.resources.displayMetrics.heightPixels / 2,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            0, // no FLAG_NOT_FOCUSABLE / FLAG_NOT_TOUCHABLE: overlay is modal, it captures touches itself
+            0, // no FLAG_NOT_FOCUSABLE / FLAG_NOT_TOUCHABLE: the sheet is modal within its own bounds
             android.graphics.PixelFormat.TRANSLUCENT,
         )
-        params.gravity = Gravity.CENTER
+        params.gravity = Gravity.BOTTOM
 
         try {
             windowManager.addView(root, params)

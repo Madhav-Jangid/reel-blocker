@@ -34,8 +34,11 @@ void main() {
 
     expect(find.text('Set up ReelLock'), findsOneWidget);
     // The button is below the fold in a ListView (Slivers only build what's
-    // visible), so scroll it into view before asserting on it.
-    await tester.scrollUntilVisible(find.text('Review and activate'), 300, scrollable: find.byType(Scrollable));
+    // visible), so scroll it into view before asserting on it. The number
+    // input fields each have their own internal Scrollable (for cursor
+    // scrolling), so find.byType(Scrollable) now matches several - the
+    // outer ListView's is the first one built.
+    await tester.scrollUntilVisible(find.text('Review and activate'), 300, scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
     expect(find.text('Review and activate'), findsOneWidget);
   });

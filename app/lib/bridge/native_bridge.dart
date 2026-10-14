@@ -81,6 +81,21 @@ class NativeBridge {
 
   Future<void> openAppSettings() => _invokeVoid('openAppSettings');
 
+  /// Requests POST_NOTIFICATIONS at runtime (Android 13+; a no-op success on
+  /// older versions). Returns whether it ended up granted.
+  Future<bool> requestNotificationPermission() async {
+    _logCall('requestNotificationPermission', null);
+    final granted = await _control.invokeMethod('requestNotificationPermission') as bool;
+    _logResult('requestNotificationPermission', granted ? 'granted' : 'denied');
+    return granted;
+  }
+
+  /// Shows the system's own "allow background activity" confirmation dialog.
+  Future<void> requestIgnoreBatteryOptimizations() => _invokeVoid('requestIgnoreBatteryOptimizations');
+
+  /// Best-effort deep link into MIUI's Autostart settings (falls back to the app's details page on other OEMs/MIUI versions).
+  Future<void> openMiuiAutostartSettings() => _invokeVoid('openMiuiAutostartSettings');
+
   Future<Map<String, dynamic>> _invokeMap(String method, [Map<String, dynamic>? args]) async {
     _logCall(method, args);
     final result = await _control.invokeMethod(method, args);

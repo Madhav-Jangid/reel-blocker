@@ -43,6 +43,15 @@ sealed class ScreenClassification {
  * rather than narrowed, per need.md's own warning: "Do not rely exclusively
  * on labels such as 'Reels'." A screen with no structural match is UNKNOWN,
  * never a guessed REELS.
+ *
+ * Second, separate issue found the same way: Instagram keeps the Reels
+ * viewer fragment attached-but-off-screen after you navigate away from it,
+ * so `clips_viewer_view_pager` and friends kept showing up in dumps of
+ * Feed/DM/Profile/Search too, for the rest of the session once Reels had
+ * been opened once - every screen after that matched `reelsStructural()`.
+ * Every id collected for classification now requires
+ * `UiNode.isVisibleToUser == true`, so a retained-but-hidden fragment's ids
+ * are never counted.
  */
 object ScreenClassifier {
 
@@ -96,7 +105,13 @@ object ScreenClassifier {
 
     private fun collectIds(node: UiNode, ids: MutableList<String>, depth: Int) {
         if (depth > MAX_DEPTH || ids.size > MAX_NODES) return
-        node.viewIdResourceName?.let { ids += it }
+        // Visible-only, same as classify() - otherwise this would show ids
+        // from Instagram's retained-off-screen fragments too, which is
+        // confusing for calibrating InstagramUiSignatures against what's
+        // actually on screen.
+        if (node.isVisibleToUser) {
+            node.viewIdResourceName?.let { ids += it }
+        }
         val childCount = node.childCount.coerceAtMost(MAX_CHILDREN_PER_NODE)
         for (i in 0 until childCount) {
             val child = node.childAt(i) ?: continue
@@ -107,7 +122,9 @@ object ScreenClassifier {
     private fun collect(node: UiNode, pool: StringPool, depth: Int): Int {
         if (depth > MAX_DEPTH) return 0
         var count = 1
-        pool.add(node.viewIdResourceName)
+        if (node.isVisibleToUser) {
+            pool.add(node.viewIdResourceName)
+        }
         val childCount = node.childCount.coerceAtMost(MAX_CHILDREN_PER_NODE)
         for (i in 0 until childCount) {
             val child = node.childAt(i) ?: continue

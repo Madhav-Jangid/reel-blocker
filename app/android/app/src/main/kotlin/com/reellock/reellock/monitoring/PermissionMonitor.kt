@@ -3,6 +3,7 @@ package com.reellock.reellock.monitoring
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
 import androidx.core.app.NotificationManagerCompat
@@ -19,7 +20,9 @@ enum class ProtectionLevel {
 data class PermissionStatus(
     val accessibilityServiceEnabled: Boolean,
     val notificationsEnabled: Boolean,
+    val batteryOptimizationIgnored: Boolean,
     val isDeviceOwner: Boolean,
+    val isMiui: Boolean,
     val protectionLevel: ProtectionLevel,
 )
 
@@ -39,13 +42,18 @@ class PermissionMonitor(private val context: Context) {
         val notificationsEnabled = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         val isDeviceOwner = devicePolicyController.isDeviceOwner()
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val batteryOptimizationIgnored = powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+        val isMiui = Build.MANUFACTURER.equals("xiaomi", ignoreCase = true)
 
         val protection = if (accessibilityEnabled) ProtectionLevel.ACTIVE else ProtectionLevel.DEGRADED
 
         return PermissionStatus(
             accessibilityServiceEnabled = accessibilityEnabled,
             notificationsEnabled = notificationsEnabled,
+            batteryOptimizationIgnored = batteryOptimizationIgnored,
             isDeviceOwner = isDeviceOwner,
+            isMiui = isMiui,
             protectionLevel = protection,
         )
     }

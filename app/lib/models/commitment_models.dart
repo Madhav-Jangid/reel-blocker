@@ -182,21 +182,31 @@ enum ProtectionLevel { active, degraded }
 class PermissionStatus {
   final bool accessibilityServiceEnabled;
   final bool notificationsEnabled;
+  final bool batteryOptimizationIgnored;
   final bool isDeviceOwner;
+  final bool isMiui;
   final ProtectionLevel protectionLevel;
 
   const PermissionStatus({
     required this.accessibilityServiceEnabled,
     required this.notificationsEnabled,
+    required this.batteryOptimizationIgnored,
     required this.isDeviceOwner,
+    required this.isMiui,
     required this.protectionLevel,
   });
 
+  // Defensive (`as bool? ?? false`) rather than a hard cast: during
+  // development the Dart and native sides can briefly be rebuilt out of
+  // sync (an old installed APK missing a newer field), and a missing
+  // optional status should degrade to "not granted", not crash the app.
   factory PermissionStatus.fromMap(Map<String, dynamic> map) => PermissionStatus(
-        accessibilityServiceEnabled: map['accessibilityServiceEnabled'] as bool,
-        notificationsEnabled: map['notificationsEnabled'] as bool,
-        isDeviceOwner: map['isDeviceOwner'] as bool,
-        protectionLevel: (map['protectionLevel'] as String) == 'ACTIVE' ? ProtectionLevel.active : ProtectionLevel.degraded,
+        accessibilityServiceEnabled: map['accessibilityServiceEnabled'] as bool? ?? false,
+        notificationsEnabled: map['notificationsEnabled'] as bool? ?? false,
+        batteryOptimizationIgnored: map['batteryOptimizationIgnored'] as bool? ?? false,
+        isDeviceOwner: map['isDeviceOwner'] as bool? ?? false,
+        isMiui: map['isMiui'] as bool? ?? false,
+        protectionLevel: (map['protectionLevel'] as String?) == 'ACTIVE' ? ProtectionLevel.active : ProtectionLevel.degraded,
       );
 }
 

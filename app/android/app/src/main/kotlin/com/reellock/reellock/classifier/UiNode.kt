@@ -12,5 +12,15 @@ interface UiNode {
     val contentDescription: String?
     val text: String?
     val childCount: Int
+    /**
+     * Whether this node is actually visible on screen right now, as opposed
+     * to merely present in the tree. Instagram keeps the Reels viewer
+     * fragment "warm" (attached but off-screen) after navigating away from
+     * it, so its resource-ids keep showing up in later dumps of Feed/DM/
+     * Profile/Search - without this check, ScreenClassifier would keep
+     * matching REELS on every screen for the rest of the session once Reels
+     * had been opened once. See AccessibilityNodeInfo.isVisibleToUser.
+     */
+    val isVisibleToUser: Boolean
     fun childAt(index: Int): UiNode?
 }

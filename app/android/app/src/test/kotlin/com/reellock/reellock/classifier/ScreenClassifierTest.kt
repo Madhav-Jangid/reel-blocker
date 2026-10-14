@@ -36,6 +36,42 @@ class ScreenClassifierTest {
     }
 
     @Test
+    fun `a retained but invisible Reels fragment does not override the visible screen`() {
+        // Regression test: Instagram keeps the Reels viewer fragment
+        // attached-but-off-screen after navigating away from it, so its
+        // resource-ids (e.g. clips_viewer_view_pager) can still be present
+        // in the tree while the user is genuinely looking at Feed/DM/
+        // Profile/Search. Confirmed from real-device logs. Only visible
+        // nodes should count toward classification.
+        val tree = node(
+            "root",
+            children = arrayOf(
+                node("direct_inbox"),
+                node("direct_thread"),
+                node("unrelated"),
+                node("clips_viewer_container", visible = false),
+                node("clips_player_surface", visible = false),
+            ),
+        )
+        val result = ScreenClassifier.classify(tree) as ScreenClassification.Classified
+        assertEquals(ScreenType.DIRECT_MESSAGES, result.screen)
+    }
+
+    @Test
+    fun `an invisible Reels fragment with no other signal is UNKNOWN, not REELS`() {
+        val tree = node(
+            "root",
+            children = arrayOf(
+                node("unrelated_1"),
+                node("unrelated_2"),
+                node("unrelated_3"),
+                node("clips_viewer_container", visible = false),
+            ),
+        )
+        assertEquals(ScreenClassification.Unknown, ScreenClassifier.classify(tree))
+    }
+
+    @Test
     fun `reels structural signal without tab selection is medium confidence`() {
         val tree = node(
             "root",

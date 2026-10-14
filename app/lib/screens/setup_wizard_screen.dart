@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../bridge/native_bridge.dart';
 import '../models/commitment_models.dart';
+import '../widgets/number_stepper_field.dart';
+import 'permission_setup_screen.dart';
 
 /// need.md section 4/6: configuration is fully editable here, but activation
 /// creates an immutable snapshot and engages the 30-day lock. Everything
@@ -97,13 +99,20 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
 
-    final result = await NativeBridge.instance.activateCommitment();
-    if (result['outcome'] == 'activated') {
-      widget.onDone();
-    } else {
-      setState(() => _error = 'Activation failed: ${result['outcome']}');
-    }
+    // Draft is saved and confirmed, but not yet activated - the permission
+    // gate decides when (and whether) activateCommitment actually gets
+    // called (need.md R9: never claim protection that can't actually run).
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PermissionSetupScreen(
+          enforcementMode: _enforcementMode,
+          onActivated: widget.onDone,
+        ),
+      ),
+    );
   }
 
   @override
@@ -119,36 +128,34 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('Reels allowance', style: Theme.of(context).textTheme.titleMedium),
-          Text('$_allowanceMinutes minutes per rolling window'),
-          Slider(
+          NumberStepperField(
+            label: 'Reels allowance',
             value: _allowanceMinutes.toDouble(),
             min: 1,
             max: 240,
-            divisions: 239,
-            label: '$_allowanceMinutes min',
+            step: 1,
+            suffix: 'min',
             onChanged: (v) => setState(() => _allowanceMinutes = v.round()),
           ),
-          const SizedBox(height: 12),
-          Text('Rolling window', style: Theme.of(context).textTheme.titleMedium),
-          Text('${_windowHours.toStringAsFixed(1)} hours'),
-          Slider(
+          const SizedBox(height: 16),
+          NumberStepperField(
+            label: 'Rolling window',
             value: _windowHours,
             min: 0.5,
             max: 48,
-            divisions: 95,
-            label: '${_windowHours.toStringAsFixed(1)}h',
+            step: 0.5,
+            suffix: 'hrs',
+            decimals: 1,
             onChanged: (v) => setState(() => _windowHours = v),
           ),
-          const SizedBox(height: 12),
-          Text('Configuration lock', style: Theme.of(context).textTheme.titleMedium),
-          Text('$_commitmentDays days from activation'),
-          Slider(
+          const SizedBox(height: 16),
+          NumberStepperField(
+            label: 'Configuration lock',
             value: _commitmentDays.toDouble(),
             min: 1,
             max: 365,
-            divisions: 364,
-            label: '$_commitmentDays d',
+            step: 1,
+            suffix: 'days',
             onChanged: (v) => setState(() => _commitmentDays = v.round()),
           ),
           const SizedBox(height: 12),

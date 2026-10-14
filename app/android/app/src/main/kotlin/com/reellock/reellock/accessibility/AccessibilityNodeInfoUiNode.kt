@@ -10,6 +10,7 @@ class AccessibilityNodeInfoUiNode(private val node: AccessibilityNodeInfo) : UiN
     override val contentDescription: String? get() = node.contentDescription?.toString()
     override val text: String? get() = node.text?.toString()
     override val childCount: Int get() = node.childCount
+    override val isVisibleToUser: Boolean get() = node.isVisibleToUser
 
     override fun childAt(index: Int): UiNode? {
         val child = node.getChild(index) ?: return null

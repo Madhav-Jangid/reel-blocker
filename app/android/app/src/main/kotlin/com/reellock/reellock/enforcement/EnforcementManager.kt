@@ -2,9 +2,11 @@ package com.reellock.reellock.enforcement
 
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
+import com.reellock.reellock.accessibility.InstagramNavigation
 import com.reellock.reellock.classifier.ScreenClassification
 import com.reellock.reellock.classifier.ScreenType
 import com.reellock.reellock.commitment.CommitmentEngine
+import com.reellock.reellock.commitment.CommitmentSnapshot
 import com.reellock.reellock.commitment.CommitmentStatus
 import com.reellock.reellock.usage.UsageAccountingEngine
 import kotlinx.coroutines.sync.Mutex
@@ -29,6 +31,18 @@ class EnforcementManager(
 
     @Volatile
     private var currentlyBlocked: Boolean = false
+
+    /** The last non-Reels screen actually confirmed (not mid-debounce) - so the block action can return the user there instead of always Feed. */
+    private var lastNonReelsScreen: ScreenType? = null
+
+    // Real Reels playback can report a single frame as "not visible" during
+    // normal buffer swaps/page recycling (confirmed from real-device logs:
+    // classification flips REELS -> UNKNOWN -> REELS every ~150ms tick while
+    // actively watching). Reacting to every tick made the block overlay
+    // itself flicker open/closed in sync with that noise. Leaving Reels is
+    // only treated as real once it's seen for two consecutive ticks in a
+    // row; a single-tick blip is ignored.
+    private var consecutiveNonReelsTicks = 0
 
     // Accessibility events can fire every ~150ms; only log when the
     // classification actually changes, so logcat reads like a timeline of
@@ -58,27 +72,22 @@ class EnforcementManager(
 
         when (classification) {
             ScreenClassification.Transition -> {
-                // need.md: "Re-evaluate after UI settles." Deliberately does nothing.
+                // need.md: "Re-evaluate after UI settles." Deliberately does
+                // nothing - doesn't count toward the leave-Reels debounce either.
             }
 
             ScreenClassification.Unknown -> {
-                usageAccountingEngine.endReelsSession("UNKNOWN_SCREEN")
-                val blockUnknown = snapshot.config?.blockUnknownScreens == true &&
-                    snapshot.status == CommitmentStatus.ACTIVE
-                if (blockUnknown) {
-                    Log.d(TAG, "Blocking: screen unrecognized and blockUnknownScreens is on")
-                    showGenericBlock(service, "This Instagram screen could not be confidently identified, and your settings require blocking unknown screens during the commitment period.")
-                } else {
-                    dismissOverlay()
-                }
+                handleLeavingReels(service, snapshot, reason = "UNKNOWN_SCREEN", isUnknown = true)
             }
 
             is ScreenClassification.Classified -> {
                 if (classification.screen != ScreenType.REELS) {
-                    usageAccountingEngine.endReelsSession("LEFT_REELS")
-                    dismissOverlay()
+                    lastNonReelsScreen = classification.screen
+                    handleLeavingReels(service, snapshot, reason = "LEFT_REELS", isUnknown = false)
                     return@withLock
                 }
+
+                consecutiveNonReelsTicks = 0 // confirmed genuinely still on Reels
 
                 if (snapshot.status != CommitmentStatus.ACTIVE || snapshot.config == null) {
                     // No active commitment: nothing to enforce, allow.
@@ -97,14 +106,15 @@ class EnforcementManager(
                         Log.d(TAG, "Reels budget exhausted (used ${budget.usedSeconds}s of ${budget.allowanceSeconds}s) -> showing block overlay")
                     }
                     showBudgetBlock(service, remainingDays, deadlineText)
-                    // GLOBAL_ACTION_BACK was unreliable here: Reels' full-screen
-                    // pager often has no back stack to pop, so it did nothing.
-                    // GLOBAL_ACTION_HOME always leaves Instagram. This fires on
-                    // EVERY blocked+REELS detection (not just the first), so
-                    // that reopening Instagram straight back into Reels while
-                    // still blocked gets kicked out again immediately, instead
-                    // of only the first time.
-                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+                    // Returns to whichever tab the user was on before Reels
+                    // (see InstagramNavigation), not always Feed. Fires on
+                    // every tick while still blocked, not just the first:
+                    // Instagram hides its bottom-nav chrome during full
+                    // immersive Reels playback, so the first attempt often
+                    // finds nothing to click and falls back to a weaker
+                    // action - retrying means it doesn't just give up after
+                    // one try that may not have actually moved the screen.
+                    InstagramNavigation.goToPreviousScreen(service, lastNonReelsScreen)
                     currentlyBlocked = true
                     eventEmitter?.emitBlockStateChanged(true, 0)
                 } else {
@@ -121,6 +131,24 @@ class EnforcementManager(
                     currentlyBlocked = false
                 }
             }
+        }
+    }
+
+    private suspend fun handleLeavingReels(service: AccessibilityService, snapshot: CommitmentSnapshot, reason: String, isUnknown: Boolean) {
+        consecutiveNonReelsTicks++
+        if (consecutiveNonReelsTicks < LEAVE_REELS_DEBOUNCE_TICKS) {
+            return
+        }
+
+        usageAccountingEngine.endReelsSession(reason)
+        val blockUnknown = isUnknown &&
+            snapshot.config?.blockUnknownScreens == true &&
+            snapshot.status == CommitmentStatus.ACTIVE
+        if (blockUnknown) {
+            Log.d(TAG, "Blocking: screen unrecognized and blockUnknownScreens is on")
+            showGenericBlock(service, "This Instagram screen could not be confidently identified, and your settings require blocking unknown screens during the commitment period.")
+        } else {
+            dismissOverlay()
         }
     }
 
@@ -157,5 +185,6 @@ class EnforcementManager(
 
     companion object {
         private const val TAG = "ReelLock"
+        private const val LEAVE_REELS_DEBOUNCE_TICKS = 2
     }
 }

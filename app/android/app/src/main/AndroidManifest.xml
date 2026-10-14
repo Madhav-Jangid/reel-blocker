@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets the user exempt ReelLock from battery-optimization process
+         killing, via the system's own confirmation dialog (requested
+         explicitly in the setup flow, never silently). This is the actual
+         mechanism behind "let it run in the background" - narrowly used for
+         exactly that, not a general always-on-in-background grab. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Lets the accessibility service query whether Instagram is installed
          (android 11+ package visibility rules). -->
