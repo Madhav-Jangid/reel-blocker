@@ -5,5 +5,5 @@
       description must truthfully state ReelLock is an automation/self-control
       tool, not an accessibility service for users with disabilities.
     -->
-    <string name="accessibility_service_description">ReelLock uses this accessibility permission to detect when Instagram shows its Reels viewer, so it can enforce the Reels time limit you configured. It is not an accessibility tool for users with disabilities. It only inspects screens belonging to the Instagram app and never reads message content.</string>
+    <string name="accessibility_service_description">ReelLock uses this accessibility permission to detect when a monitored app (Instagram Reels, YouTube Shorts) shows its short-form video viewer, so it can enforce the time limit you configured. It is not an accessibility tool for users with disabilities. It only inspects screens belonging to those apps and never reads message content.</string>
 </resources>

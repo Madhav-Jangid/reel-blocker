@@ -2,6 +2,10 @@
 
 Implementation of `need.md` - Flutter UI, native Kotlin enforcement core, local-first, no backend.
 
+**Scope note**: `need.md` itself only covers Instagram Reels. Multi-app support
+(YouTube Shorts, sharing one budget with Reels) was added afterward at the project
+owner's request and isn't in that spec - see `classifier/AppSignatures.kt`.
+
 ## Layout
 
 ```
@@ -11,8 +15,8 @@ app/                           Flutter project (UI) + Android host module
     config/                    CommitmentConfig + ConfigValidator (R1)
     commitment/                CommitmentEngine - the single lock-state gate (R3)
     usage/                     UsageAccountingEngine + RollingWindowCalculator (R2)
-    classifier/                ScreenClassifier + Instagram UI signatures (section 5)
-    accessibility/              InstagramAccessibilityService (the detector)
+    classifier/                ScreenClassifier + per-app UI signatures (section 5; Instagram + YouTube)
+    accessibility/              ReelLockAccessibilityService (the detector) + AppNavigation
     enforcement/                EnforcementManager + BlockOverlayManager
     recovery/                   RecoveryManager + ECDSA challenge/response (section 7)
     deviceadmin/                DevicePolicyController (Managed mode, section 8)
@@ -34,12 +38,14 @@ flutter build apk --debug      # or: flutter run -d <device-id>
 ```
 
 Verified in this environment: `flutter analyze` (clean), `flutter test` (2/2 passing),
-`./gradlew :app:assembleDebug` (builds), `./gradlew :app:testDebugUnitTest` (28/28 passing,
+`./gradlew :app:assembleDebug` (builds), `./gradlew :app:testDebugUnitTest` (36/36 passing,
 including a Node-generated key+signature verified against the Kotlin side -
-see `NodeInteropTest.kt`). **Not verified here** (no physical device/emulator was
-available in this session): the accessibility service against a real, current Instagram
-build; boot-receiver behavior across an actual reboot; device-owner provisioning. See
-"Known limitations and what still needs device testing" below.
+see `NodeInteropTest.kt`). **Not verified here** (no physical device/emulator with
+Instagram or YouTube installed was available in this session): the accessibility
+service against real, current Instagram and YouTube builds; boot-receiver behavior
+across an actual reboot; device-owner provisioning. See "Known limitations and what
+still needs device testing" below - YouTube Shorts detection in particular is
+unverified guesswork until someone runs it against a real device.
 
 ### One Gradle version note
 
@@ -119,9 +125,10 @@ Automated, pure-JVM (no device/emulator needed), run with
 - `ConfigValidatorTest` - allowance/window/commitment-day range and consistency rules (R1).
 - `RollingWindowCalculatorTest` - the rolling 5-hour budget math (R2), including
   partial overlap at window boundaries, open/ongoing intervals, and exhaustion to zero.
-- `ScreenClassifierTest` - the four-outcome classifier (REELS/NON_REELS/TRANSITION/
+- `ScreenClassifierTest` - the four-outcome classifier (SHORT_VIDEO/OTHER/TRANSITION/
   UNKNOWN) against hand-built node trees, including the "a stray 'Reels' label inside
-  a DM or feed screen must not misclassify it" case need.md calls out explicitly.
+  a DM or feed screen must not misclassify it" case need.md calls out explicitly, plus
+  a check that the same generic classifier dispatches correctly on YouTube's signatures.
 - `RecoveryCryptoTest` - ECDSA sign/verify round trip, rejects a tampered challenge,
   rejects a signature from the wrong keypair, rejects a garbage public key.
 - Flutter `widget_test.dart` - the root router opens the setup wizard with no
@@ -133,11 +140,20 @@ Automated, pure-JVM (no device/emulator needed), run with
 These are the honest gaps, consistent with need.md's own repeated warnings that this
 is not a tamper-proof boundary against a compromised device or a determined owner:
 
-- **Instagram UI signatures will drift.** `InstagramUiSignatures.kt` lists resource-id
-  substrings observed at the time of writing. Instagram changes its UI without
-  notice. Nothing in this codebase can test against a real, current Instagram build
-  without a device - do that before trusting this for real enforcement, and expect to
-  update the signature list.
+- **Instagram UI signatures will drift.** `AppSignatureRegistry`'s Instagram entry
+  lists resource-id substrings observed at the time of writing, calibrated against a
+  real device over this project's development. Instagram changes its UI without
+  notice. Nothing in this codebase can continuously test against a real, current
+  Instagram build without a device - re-check before trusting this for real
+  enforcement, and expect to update the signature list.
+- **YouTube Shorts signatures are unverified guesses, not calibrated at all.**
+  `AppSignatureRegistry`'s YouTube entry was written with no YouTube-installed device
+  available to check against - unlike Instagram's list, these resource-id substrings
+  have never matched anything real. Expect YouTube Shorts detection to simply not
+  work (fail safe: UNKNOWN, not a false block) until someone runs the same
+  live-logcat calibration cycle Instagram went through: install YouTube, open
+  Shorts, watch the Activity tab's "Live" feed for the actual ids that appear, and
+  correct `AppSignatureRegistry` against that evidence.
 - **CommitmentEngine / UsageAccountingEngine integration is untested in this session.**
   Both depend on Room + `TrustedTimeManager` (which needs Android Keystore via
   `EncryptedSharedPreferences`), so they need Robolectric or a real device/emulator,
@@ -160,6 +176,13 @@ is not a tamper-proof boundary against a compromised device or a determined owne
   interpreter was available in this session to confirm its output round-trips the
   same way. Its encoding choices mirror the JS version, so it should interoperate,
   but verify it yourself before depending on it.
+- **Redirecting off a blocked screen always goes to the app's primary/home tab now,
+  not the exact previous tab.** A side effect of generalizing the classifier beyond
+  Instagram: the old version remembered the specific tab (feed/DM/profile/search) the
+  user was on before Reels; `ScreenType` collapsed to just SHORT_VIDEO/OTHER so the
+  same code works for any monitored app, which removed what that memory was keyed on.
+  `GLOBAL_ACTION_BACK` (tried before falling back to the primary tab) still recovers
+  the exact previous screen in most real navigations.
 - **No "remaining time" HUD while actively watching Reels** - only the block overlay
   at exhaustion is implemented; the dashboard's remaining-budget bar only updates on
   open/refresh/block events, not continuously second-by-second.

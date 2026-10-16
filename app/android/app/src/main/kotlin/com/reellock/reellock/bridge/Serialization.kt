@@ -16,7 +16,7 @@ fun CommitmentConfig.toMap(): Map<String, Any?> = mapOf(
     "commitmentDays" to commitmentDays,
     "recoveryMode" to recoveryMode.name,
     "enforcementMode" to enforcementMode.name,
-    "targetPackage" to targetPackage,
+    "monitoredApps" to monitoredApps.toList(),
     "blockUnknownScreens" to blockUnknownScreens,
     "allowRecoveryDuringLock" to allowRecoveryDuringLock,
 )
@@ -28,7 +28,8 @@ fun configFromMap(map: Map<String, Any?>): CommitmentConfig = CommitmentConfig(
     commitmentDays = (map["commitmentDays"] as Number).toInt(),
     recoveryMode = com.reellock.reellock.config.RecoveryMode.valueOf(map["recoveryMode"] as String),
     enforcementMode = com.reellock.reellock.config.EnforcementMode.valueOf(map["enforcementMode"] as String),
-    targetPackage = (map["targetPackage"] as? String) ?: "com.instagram.android",
+    monitoredApps = (map["monitoredApps"] as? List<*>)?.mapTo(mutableSetOf()) { it as String }
+        ?: setOf(com.reellock.reellock.classifier.TargetApp.INSTAGRAM.packageName),
     blockUnknownScreens = (map["blockUnknownScreens"] as? Boolean) ?: false,
     allowRecoveryDuringLock = (map["allowRecoveryDuringLock"] as? Boolean) ?: true,
 )

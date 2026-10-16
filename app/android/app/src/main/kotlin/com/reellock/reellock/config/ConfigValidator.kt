@@ -1,5 +1,7 @@
 package com.reellock.reellock.config
 
+import com.reellock.reellock.classifier.TargetApp
+
 /**
  * R1: "Allowance and window are editable before activation." This validates
  * the *ranges* the setup wizard allows; CommitmentEngine separately enforces
@@ -34,8 +36,12 @@ object ConfigValidator {
         if (config.commitmentDays !in MIN_COMMITMENT_DAYS..MAX_COMMITMENT_DAYS) {
             errors += "commitmentDays must be between $MIN_COMMITMENT_DAYS and $MAX_COMMITMENT_DAYS"
         }
-        if (config.targetPackage.isBlank()) {
-            errors += "targetPackage must not be blank"
+        if (config.monitoredApps.isEmpty()) {
+            errors += "monitoredApps must contain at least one app"
+        }
+        val supportedPackages = TargetApp.entries.map { it.packageName }.toSet()
+        if (config.monitoredApps.any { it !in supportedPackages }) {
+            errors += "monitoredApps contains an unsupported package"
         }
         // `version` is deliberately not validated here: it is assigned by
         // CommitmentEngine.saveDraft, not by the caller. A brand-new draft

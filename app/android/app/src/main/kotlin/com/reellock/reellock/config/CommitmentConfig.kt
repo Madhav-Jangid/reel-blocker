@@ -1,9 +1,17 @@
 package com.reellock.reellock.config
 
+import com.reellock.reellock.classifier.TargetApp
+
 /**
  * User-editable rule set, per need.md section 4. Only ever mutable before
  * activation or after expiry/authorized recovery — CommitmentEngine is the
  * sole gate that enforces that, never the UI.
+ *
+ * [monitoredApps] (package names) replaced a single hardcoded targetPackage
+ * once YouTube Shorts support was added alongside Instagram Reels - they
+ * share one allowance/window (usageAccountingEngine has no notion of
+ * "which app" at all), so this only controls which apps' screens actually
+ * count against it and get redirected away from.
  */
 data class CommitmentConfig(
     val version: Int,
@@ -12,7 +20,7 @@ data class CommitmentConfig(
     val commitmentDays: Int,
     val recoveryMode: RecoveryMode,
     val enforcementMode: EnforcementMode,
-    val targetPackage: String = "com.instagram.android",
+    val monitoredApps: Set<String> = setOf(TargetApp.INSTAGRAM.packageName),
     val blockUnknownScreens: Boolean = false,
     val allowRecoveryDuringLock: Boolean = true,
 ) {
@@ -24,6 +32,7 @@ data class CommitmentConfig(
             commitmentDays = 30,
             recoveryMode = RecoveryMode.TRUSTED_PERSON,
             enforcementMode = EnforcementMode.ACCESSIBILITY,
+            monitoredApps = setOf(TargetApp.INSTAGRAM.packageName),
             blockUnknownScreens = false,
             allowRecoveryDuringLock = true,
         )

@@ -16,7 +16,8 @@ data class CommitmentConfigEntity(
     val commitmentDays: Int,
     val recoveryMode: String,
     val enforcementMode: String,
-    val targetPackage: String,
+    /** Comma-joined package names - see CommitmentConfig.monitoredApps. */
+    val monitoredApps: String,
     val blockUnknownScreens: Boolean,
     val allowRecoveryDuringLock: Boolean,
     val trustedPersonPublicKeyBase64: String?,

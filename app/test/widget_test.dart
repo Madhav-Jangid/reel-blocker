@@ -57,7 +57,7 @@ void main() {
               'commitmentDays': 30,
               'recoveryMode': 'TRUSTED_PERSON',
               'enforcementMode': 'ACCESSIBILITY',
-              'targetPackage': 'com.instagram.android',
+              'monitoredApps': ['com.instagram.android'],
               'blockUnknownScreens': false,
               'allowRecoveryDuringLock': true,
             },
@@ -79,9 +79,13 @@ void main() {
           return {
             'accessibilityServiceEnabled': true,
             'notificationsEnabled': true,
+            'batteryOptimizationIgnored': true,
             'isDeviceOwner': false,
+            'isMiui': false,
             'protectionLevel': 'ACTIVE',
           };
+        case 'getSecurityEvents':
+          return <Map<String, dynamic>>[];
         default:
           return null;
       }
@@ -90,8 +94,11 @@ void main() {
     await tester.pumpWidget(const ReelLockApp());
     await tester.pumpAndSettle();
 
+    // HomeShell's AppBar title for the Dashboard tab (index 0).
     expect(find.text('ReelLock'), findsOneWidget);
-    expect(find.text('Active - locked'), findsOneWidget);
-    expect(find.textContaining('min remaining'), findsOneWidget);
+    // StatusPill label for an ACTIVE (non-recovery-pending) commitment.
+    expect(find.text('Active'), findsOneWidget);
+    // BudgetGauge's small label, e.g. "of 30 min left".
+    expect(find.textContaining('min left'), findsOneWidget);
   });
 }

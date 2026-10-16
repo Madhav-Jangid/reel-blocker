@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../bridge/native_bridge.dart';
 import '../models/commitment_models.dart';
+import '../theme/app_theme.dart';
+import '../widgets/permission_tile.dart';
 
 /// need.md R9 "transparent failure handling": activating a commitment
 /// without the accessibility service enabled would silently claim
@@ -87,25 +89,25 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> with Widg
       body: status == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.m),
               children: [
-                const Text(
-                  'ReelLock needs these before the commitment can start - without them it would '
-                  'activate the lock while unable to actually detect Reels, which need.md explicitly '
-                  'treats as a failure to surface, never to hide.',
+                Text(
+                  "ReelLock needs these before the commitment can start - without them it would "
+                  'activate the lock while unable to actually detect short-form video.',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 20),
-                _PermissionTile(
+                const SizedBox(height: AppSpacing.l),
+                PermissionTile(
                   icon: Icons.accessibility_new,
                   title: 'Accessibility service',
-                  subtitle: 'Required. This is the only thing that detects when Reels is open.',
+                  subtitle: 'Required. This is the only thing that detects when a monitored app shows short-form video.',
                   granted: accessibilityGranted,
                   required: true,
                   actionLabel: 'Open settings',
                   onAction: () => NativeBridge.instance.openAccessibilitySettings(),
                 ),
-                const SizedBox(height: 12),
-                _PermissionTile(
+                const SizedBox(height: AppSpacing.s),
+                PermissionTile(
                   icon: Icons.notifications_outlined,
                   title: 'Notifications',
                   subtitle: 'Optional. Shows the "ReelLock is active" status while it watches in the background.',
@@ -116,23 +118,23 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> with Widg
                       ? () => NativeBridge.instance.openAppSettings()
                       : _requestNotifications,
                 ),
-                const SizedBox(height: 12),
-                _PermissionTile(
+                const SizedBox(height: AppSpacing.s),
+                PermissionTile(
                   icon: Icons.battery_charging_full,
                   title: 'Background activity',
                   subtitle: 'Optional, but strongly recommended. Without this, Android may kill ReelLock (and its '
-                      'detection) a few minutes after you leave Instagram or swipe the app away.',
+                      'detection) a few minutes after you leave a monitored app or swipe ReelLock away.',
                   granted: status.batteryOptimizationIgnored,
                   required: false,
                   actionLabel: 'Allow',
                   onAction: () => NativeBridge.instance.requestIgnoreBatteryOptimizations(),
                 ),
                 if (status.isMiui) ...[
-                  const SizedBox(height: 12),
-                  _PermissionTile(
+                  const SizedBox(height: AppSpacing.s),
+                  PermissionTile(
                     icon: Icons.phonelink_lock_outlined,
                     title: 'MIUI Autostart',
-                    subtitle: 'Optional, but needed on MIUI specifically - it has its own background-kill switch on '
+                    subtitle: "Optional, but needed on MIUI specifically - it has its own background-kill switch on "
                         "top of Android's. Can't be checked automatically; turn it on for ReelLock on the screen that opens.",
                     granted: false,
                     required: false,
@@ -142,8 +144,8 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> with Widg
                   ),
                 ],
                 if (widget.enforcementMode == EnforcementMode.deviceManaged) ...[
-                  const SizedBox(height: 12),
-                  _PermissionTile(
+                  const SizedBox(height: AppSpacing.s),
+                  PermissionTile(
                     icon: Icons.admin_panel_settings_outlined,
                     title: 'Device admin (managed mode)',
                     subtitle: 'Optional. Only takes effect if this device is provisioned as device owner - see README. '
@@ -154,11 +156,11 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> with Widg
                     onAction: () => NativeBridge.instance.openDeviceAdminSettings(),
                   ),
                 ],
-                const SizedBox(height: 28),
+                const SizedBox(height: AppSpacing.l),
                 if (_error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                    child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   ),
                 FilledButton(
                   onPressed: canActivate ? _activate : null,
@@ -167,77 +169,15 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen> with Widg
                       : const Text('Activate commitment'),
                 ),
                 if (!accessibilityGranted)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.s),
                     child: Text(
                       'Enable the accessibility service above to continue.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
               ],
             ),
-    );
-  }
-}
-
-class _PermissionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool granted;
-  final bool required;
-  final String actionLabel;
-  final VoidCallback onAction;
-  /// True for permissions Android gives no API to check (e.g. MIUI
-  /// Autostart) - always shows the action button, never a false checkmark.
-  final bool statusUnverifiable;
-
-  const _PermissionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.granted,
-    required this.required,
-    required this.actionLabel,
-    required this.onAction,
-    this.statusUnverifiable = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: granted ? Colors.green : null),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(title, style: Theme.of(context).textTheme.titleMedium),
-                      if (required) ...[
-                        const SizedBox(width: 6),
-                        const Text('Required', style: TextStyle(fontSize: 11, color: Colors.red)),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            (granted && !statusUnverifiable)
-                ? const Icon(Icons.check_circle, color: Colors.green)
-                : OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
-          ],
-        ),
-      ),
     );
   }
 }

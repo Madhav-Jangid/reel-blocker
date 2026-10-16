@@ -138,7 +138,7 @@ class NativeBridge {
         final ids = List<String>.from(event['resourceIds'] as List);
         final joined = ids.join(', ');
         // Only log when the actual set of ids changes - this is the raw
-        // material for calibrating InstagramUiSignatures.kt, so print the
+        // material for calibrating AppSignatures.kt, so print the
         // real strings, not just a count.
         if (joined != _lastLoggedResourceIds) {
           debugPrint('[ReelLock] event: diagnostics (${ids.length} ids): $joined');

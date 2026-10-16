@@ -13,10 +13,11 @@
          exactly that, not a general always-on-in-background grab. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Lets the accessibility service query whether Instagram is installed
-         (android 11+ package visibility rules). -->
+    <!-- Lets the accessibility service query whether a monitored app is
+         installed (android 11+ package visibility rules). -->
     <queries>
         <package android:name="com.instagram.android" />
+        <package android:name="com.google.android.youtube" />
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
@@ -66,14 +67,14 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Monitoring Instagram Reels usage to enforce a user-configured digital wellbeing limit" />
+                android:value="Monitoring short-form video usage to enforce a user-configured digital wellbeing limit" />
         </service>
 
-        <!-- Detection core: see classifier/InstagramAccessibilityService.kt -->
+        <!-- Detection core: see accessibility/ReelLockAccessibilityService.kt -->
         <service
-            android:name=".accessibility.InstagramAccessibilityService"
+            android:name=".accessibility.ReelLockAccessibilityService"
             android:exported="false"
-            android:label="ReelLock Reels Detection"
+            android:label="ReelLock Short-Video Detection"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

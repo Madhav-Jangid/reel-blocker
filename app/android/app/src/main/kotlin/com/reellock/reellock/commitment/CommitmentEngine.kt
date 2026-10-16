@@ -202,7 +202,7 @@ private fun CommitmentConfigEntity.toConfig() = CommitmentConfig(
     commitmentDays = commitmentDays,
     recoveryMode = RecoveryMode.valueOf(recoveryMode),
     enforcementMode = EnforcementMode.valueOf(enforcementMode),
-    targetPackage = targetPackage,
+    monitoredApps = monitoredApps.split(",").map { it.trim() }.filterTo(mutableSetOf()) { it.isNotEmpty() },
     blockUnknownScreens = blockUnknownScreens,
     allowRecoveryDuringLock = allowRecoveryDuringLock,
 )
@@ -214,7 +214,7 @@ private fun CommitmentConfig.toEntity(version: Int, isDraft: Boolean, trustedPer
     commitmentDays = commitmentDays,
     recoveryMode = recoveryMode.name,
     enforcementMode = enforcementMode.name,
-    targetPackage = targetPackage,
+    monitoredApps = monitoredApps.joinToString(","),
     blockUnknownScreens = blockUnknownScreens,
     allowRecoveryDuringLock = allowRecoveryDuringLock,
     trustedPersonPublicKeyBase64 = trustedPersonPublicKeyBase64,

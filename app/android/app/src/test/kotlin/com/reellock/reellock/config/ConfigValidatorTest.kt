@@ -37,9 +37,26 @@ class ConfigValidatorTest {
     }
 
     @Test
-    fun `blank target package is rejected`() {
-        val config = baseConfig().copy(targetPackage = "  ")
+    fun `empty monitoredApps is rejected`() {
+        val config = baseConfig().copy(monitoredApps = emptySet())
         assertTrue(ConfigValidator.validate(config) is ConfigValidator.ValidationResult.Invalid)
+    }
+
+    @Test
+    fun `an unsupported package in monitoredApps is rejected`() {
+        val config = baseConfig().copy(monitoredApps = setOf("com.some.other.app"))
+        assertTrue(ConfigValidator.validate(config) is ConfigValidator.ValidationResult.Invalid)
+    }
+
+    @Test
+    fun `both supported apps monitored together is valid`() {
+        val config = baseConfig().copy(
+            monitoredApps = setOf(
+                com.reellock.reellock.classifier.TargetApp.INSTAGRAM.packageName,
+                com.reellock.reellock.classifier.TargetApp.YOUTUBE.packageName,
+            ),
+        )
+        assertEquals(ConfigValidator.ValidationResult.Valid, ConfigValidator.validate(config))
     }
 
     @Test

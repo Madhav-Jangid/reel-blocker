@@ -7,7 +7,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
 import androidx.core.app.NotificationManagerCompat
-import com.reellock.reellock.accessibility.InstagramAccessibilityService
+import com.reellock.reellock.accessibility.ReelLockAccessibilityService
 import com.reellock.reellock.deviceadmin.DevicePolicyController
 
 enum class ProtectionLevel {
@@ -59,7 +59,7 @@ class PermissionMonitor(private val context: Context) {
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
-        val expected = ComponentName(context, InstagramAccessibilityService::class.java)
+        val expected = ComponentName(context, ReelLockAccessibilityService::class.java)
         val enabledServicesSetting = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,

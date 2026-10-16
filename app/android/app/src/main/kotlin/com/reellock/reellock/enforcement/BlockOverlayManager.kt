@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.reellock.reellock.R
+import com.reellock.reellock.classifier.TargetApp
 import kotlin.math.max
 
 /**
@@ -42,19 +43,26 @@ class BlockOverlayManager(private val service: AccessibilityService) {
         service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     }
 
+    /** Invoked when the user taps "Got it" - as opposed to [dismiss] being called programmatically. EnforcementManager uses this to know the sheet is gone without having to poll [isShowing]. */
+    var onUserDismiss: (() -> Unit)? = null
+
     fun isShowing(): Boolean = overlayView != null
 
-    fun show(remainingDays: Long, deadlineText: String) {
-        mainHandler.post { showOnMainThread(remainingDays, deadlineText) }
+    /**
+     * [deadlineText] doubles as a plain message when [isGenericMessage] is
+     * true (the blockUnknownScreens path) - [remainingDays] is ignored then.
+     */
+    fun show(app: TargetApp, remainingDays: Long, deadlineText: String, isGenericMessage: Boolean = false) {
+        mainHandler.post { showOnMainThread(app, remainingDays, deadlineText, isGenericMessage) }
     }
 
     fun dismiss() {
         mainHandler.post { dismissOnMainThread() }
     }
 
-    private fun showOnMainThread(remainingDays: Long, deadlineText: String) {
+    private fun showOnMainThread(app: TargetApp, remainingDays: Long, deadlineText: String, isGenericMessage: Boolean) {
         if (overlayView != null) {
-            updateText(remainingDays, deadlineText)
+            updateText(app, remainingDays, deadlineText, isGenericMessage)
             return
         }
 
@@ -76,7 +84,7 @@ class BlockOverlayManager(private val service: AccessibilityService) {
         }
 
         val title = TextView(service).apply {
-            text = "Reels is locked for now"
+            tag = TAG_TITLE
             setTextColor(Color.WHITE)
             textSize = 20f
             setTypeface(typeface, Typeface.BOLD)
@@ -107,11 +115,12 @@ class BlockOverlayManager(private val service: AccessibilityService) {
             )
             setOnClickListener {
                 // Just closes the sheet - it doesn't navigate anywhere.
-                // EnforcementManager already moved the user off Reels (see
-                // InstagramNavigation) when this first showed; if they're
-                // still on a blocked Reels screen, the very next
-                // classification event re-shows it.
+                // EnforcementManager already moved the user off the
+                // short-video screen (see AppNavigation) before this was
+                // shown; if they navigate back into it while still blocked,
+                // the sheet is shown again after the next successful redirect.
                 dismissOnMainThread()
+                onUserDismiss?.invoke()
             }
         }
 
@@ -120,7 +129,7 @@ class BlockOverlayManager(private val service: AccessibilityService) {
         root.addView(body)
         root.addView(dismissButton)
         overlayView = root
-        updateText(remainingDays, deadlineText)
+        updateText(app, remainingDays, deadlineText, isGenericMessage)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -154,16 +163,26 @@ class BlockOverlayManager(private val service: AccessibilityService) {
         overlayView = null
     }
 
-    private fun updateText(remainingDays: Long, deadlineText: String) {
+    private fun updateText(app: TargetApp, remainingDays: Long, deadlineText: String, isGenericMessage: Boolean) {
+        val title = overlayView?.findViewWithTag<TextView>(TAG_TITLE)
         val body = overlayView?.findViewWithTag<TextView>(TAG_BODY) ?: return
+
+        if (isGenericMessage) {
+            title?.text = "Screen locked"
+            body.text = deadlineText
+            return
+        }
+
+        title?.text = "${app.displayName} is locked for now"
         val days = max(remainingDays, 0)
-        body.text = "Your Reels allowance for this 5-hour window is used up.\n" +
+        body.text = "Your short-form video allowance for this window is used up.\n" +
             "Settings stay locked for $days more day(s), until $deadlineText.\n" +
-            "DMs, feed, profile and search are still available.\n" +
+            "Everything else in ${app.appName} is still available.\n" +
             "Need an exception? Ask your trusted person for recovery."
     }
 
     companion object {
+        private const val TAG_TITLE = "reellock_overlay_title"
         private const val TAG_BODY = "reellock_overlay_body"
         private const val TAG = "ReelLock"
     }

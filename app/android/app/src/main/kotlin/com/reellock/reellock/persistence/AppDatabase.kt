@@ -36,7 +36,14 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "reellock.db",
-                ).build().also { instance = it }
+                )
+                    // Pre-release, actively iterating on entity shape (e.g.
+                    // the targetPackage -> monitoredApps column change) with
+                    // only real-device test installs, no shipped migrations
+                    // yet - destructive fallback over hand-written
+                    // Migration objects until a first real release exists.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

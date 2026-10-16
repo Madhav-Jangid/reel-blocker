@@ -3,38 +3,34 @@ package com.reellock.reellock.classifier
 import com.reellock.reellock.commitment.Confidence
 
 enum class ScreenType {
-    REELS,
-    FEED,
-    DIRECT_MESSAGES,
-    PROFILE,
-    SEARCH,
-    OTHER_NON_REELS,
+    SHORT_VIDEO,
+    OTHER,
 }
 
 sealed class ScreenClassification {
-    data class Classified(val screen: ScreenType, val confidence: Confidence) : ScreenClassification()
+    data class Classified(val app: TargetApp, val screen: ScreenType, val confidence: Confidence) : ScreenClassification()
     object Transition : ScreenClassification()
     object Unknown : ScreenClassification()
 }
 
 /**
  * Pure, synchronously-testable classification logic (need.md section 5: four
- * outcomes NON_REELS / REELS / TRANSITION / UNKNOWN - here NON_REELS is
- * expanded into its concrete screen types since enforcement needs to tell
- * DMs/feed/profile/search apart for the diagnostic screen, even though they
- * are all "allow" for blocking purposes).
+ * outcomes NON_REELS / REELS / TRANSITION / UNKNOWN - generalized here to
+ * SHORT_VIDEO / OTHER / TRANSITION / UNKNOWN once ReelLock grew beyond
+ * Instagram to also support YouTube Shorts). Callers resolve which app's
+ * [AppSignatures] to pass in via [AppSignatureRegistry]; this object itself
+ * has no app-specific knowledge.
  *
  * Order of evaluation matters and is deliberately conservative:
  *   1. Too few nodes -> TRANSITION (UI still loading/animating).
- *   2. Any explicit non-Reels structural signal -> that screen, HIGH
- *      confidence. Checked first so a stray "Reels" label inside, say, a
- *      feed post's attached clip never overrides a clear feed/DM/profile
- *      signal (need.md: avoid blocking ordinary feed videos).
- *   3. A Reels structural signal -> REELS, confidence raised to HIGH if a
- *      tab-selection signal also corroborates it, else MEDIUM.
+ *   2. Any explicit other-known-screen structural signal -> OTHER, HIGH
+ *      confidence. Checked first so a stray short-video id inside, say, a
+ *      feed post's attached clip never overrides a clear other-screen signal.
+ *   3. A short-video structural signal -> SHORT_VIDEO, confidence raised to
+ *      HIGH if a tab-selection signal also corroborates it, else MEDIUM.
  *   4. Nothing recognized -> UNKNOWN (caller applies blockUnknownScreens policy).
  *
- * There used to be a step 4 here: a label-only ("Reels"/"Original audio")
+ * There used to be a step here: a label-only ("Reels"/"Original audio")
  * fallback to REELS at LOW confidence. Real-device logs showed Instagram's
  * bottom-nav tab bar icon carries contentDescription "Reels" as its
  * accessibility label, present on literally every main screen (Feed,
@@ -42,45 +38,38 @@ sealed class ScreenClassification {
  * fallback classified ordinary feed scrolling as REELS. Removed entirely
  * rather than narrowed, per need.md's own warning: "Do not rely exclusively
  * on labels such as 'Reels'." A screen with no structural match is UNKNOWN,
- * never a guessed REELS.
+ * never a guessed SHORT_VIDEO.
  *
  * Second, separate issue found the same way: Instagram keeps the Reels
  * viewer fragment attached-but-off-screen after you navigate away from it,
  * so `clips_viewer_view_pager` and friends kept showing up in dumps of
  * Feed/DM/Profile/Search too, for the rest of the session once Reels had
- * been opened once - every screen after that matched `reelsStructural()`.
- * Every id collected for classification now requires
+ * been opened once - every screen after that matched the short-video
+ * signals. Every id collected for classification now requires
  * `UiNode.isVisibleToUser == true`, so a retained-but-hidden fragment's ids
  * are never counted.
  */
 object ScreenClassifier {
 
-    fun classify(root: UiNode?): ScreenClassification {
+    const val MIN_NODES_FOR_CONFIDENT_CLASSIFICATION = 4
+
+    fun classify(app: TargetApp, signatures: AppSignatures, root: UiNode?): ScreenClassification {
         if (root == null) return ScreenClassification.Transition
 
         val dump = StringPool()
         val nodeCount = collect(root, dump, depth = 0)
 
-        if (nodeCount < InstagramUiSignatures.MIN_NODES_FOR_CONFIDENT_CLASSIFICATION) {
+        if (nodeCount < MIN_NODES_FOR_CONFIDENT_CLASSIFICATION) {
             return ScreenClassification.Transition
         }
 
-        dump.directMessages().takeIf { it }?.let {
-            return ScreenClassification.Classified(ScreenType.DIRECT_MESSAGES, Confidence.HIGH)
-        }
-        dump.feed().takeIf { it }?.let {
-            return ScreenClassification.Classified(ScreenType.FEED, Confidence.HIGH)
-        }
-        dump.profile().takeIf { it }?.let {
-            return ScreenClassification.Classified(ScreenType.PROFILE, Confidence.HIGH)
-        }
-        dump.search().takeIf { it }?.let {
-            return ScreenClassification.Classified(ScreenType.SEARCH, Confidence.HIGH)
+        if (dump.matchesAny(signatures.otherKnownResourceIdSignals)) {
+            return ScreenClassification.Classified(app, ScreenType.OTHER, Confidence.HIGH)
         }
 
-        if (dump.reelsStructural()) {
-            val confidence = if (dump.reelsTabSelected()) Confidence.HIGH else Confidence.MEDIUM
-            return ScreenClassification.Classified(ScreenType.REELS, confidence)
+        if (dump.matchesAny(signatures.shortVideoResourceIdSignals)) {
+            val confidence = if (dump.matchesAny(signatures.shortVideoTabSignals)) Confidence.HIGH else Confidence.MEDIUM
+            return ScreenClassification.Classified(app, ScreenType.SHORT_VIDEO, confidence)
         }
 
         return ScreenClassification.Unknown
@@ -88,9 +77,9 @@ object ScreenClassifier {
 
     /**
      * Diagnostic-only: the raw resource-ids seen on screen, with no
-     * filtering/matching applied. Used by the Diagnostics screen so a real
-     * device's actual Instagram build can be used to calibrate
-     * InstagramUiSignatures, instead of guessing (need.md P2: "a diagnostic
+     * filtering/matching applied. Used by the Activity tab's "Live" feed so a
+     * real device's actual app build can be used to calibrate
+     * AppSignatureRegistry, instead of guessing (need.md P2: "a diagnostic
      * screen that records classifications without collecting message
      * contents" - deliberately resource-ids only, never `text` or
      * `contentDescription`, since those can carry captions/usernames/DM
@@ -106,8 +95,8 @@ object ScreenClassifier {
     private fun collectIds(node: UiNode, ids: MutableList<String>, depth: Int) {
         if (depth > MAX_DEPTH || ids.size > MAX_NODES) return
         // Visible-only, same as classify() - otherwise this would show ids
-        // from Instagram's retained-off-screen fragments too, which is
-        // confusing for calibrating InstagramUiSignatures against what's
+        // from the app's retained-off-screen fragments too, which is
+        // confusing for calibrating AppSignatureRegistry against what's
         // actually on screen.
         if (node.isVisibleToUser) {
             node.viewIdResourceName?.let { ids += it }
@@ -149,13 +138,6 @@ object ScreenClassifier {
             resourceId?.let { resourceIds += it.lowercase() }
         }
 
-        private fun resourceIdsContainAny(signals: List<String>) = resourceIds.any { id -> signals.any { id.contains(it) } }
-
-        fun directMessages() = resourceIdsContainAny(InstagramUiSignatures.DIRECT_MESSAGES_RESOURCE_ID_SIGNALS)
-        fun feed() = resourceIdsContainAny(InstagramUiSignatures.FEED_RESOURCE_ID_SIGNALS)
-        fun profile() = resourceIdsContainAny(InstagramUiSignatures.PROFILE_RESOURCE_ID_SIGNALS)
-        fun search() = resourceIdsContainAny(InstagramUiSignatures.SEARCH_RESOURCE_ID_SIGNALS)
-        fun reelsStructural() = resourceIdsContainAny(InstagramUiSignatures.REELS_RESOURCE_ID_SIGNALS)
-        fun reelsTabSelected() = resourceIdsContainAny(InstagramUiSignatures.REELS_TAB_SIGNALS)
+        fun matchesAny(signals: List<String>) = resourceIds.any { id -> signals.any { id.contains(it) } }
     }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../bridge/native_bridge.dart';
 import '../models/commitment_models.dart';
 import 'setup_wizard_screen.dart';
-import 'dashboard_screen.dart';
+import 'home_shell.dart';
 import 'post_commitment_screen.dart';
 
 /// Loads the CommitmentEngine's current state (see commitment/CommitmentEngine.kt
@@ -65,7 +65,7 @@ class _RootScreenState extends State<RootScreen> {
             return SetupWizardScreen(initialConfig: data.config, onDone: refresh);
           case CommitmentStatus.active:
           case CommitmentStatus.recoveryPending:
-            return DashboardScreen(snapshot: data, onNeedsRefresh: refresh);
+            return HomeShell(snapshot: data, onNeedsRefresh: refresh);
           case CommitmentStatus.recovered:
           case CommitmentStatus.expired:
             return PostCommitmentScreen(snapshot: data, onReconfigured: refresh);

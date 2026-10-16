@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../bridge/native_bridge.dart';
 import '../models/commitment_models.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_card.dart';
 
 /// need.md section 7: a recovery request produces a challenge the user
 /// copies to their trusted person out of band (text, QR photo, whatever).
 /// The trusted person signs it OFFLINE on their own device - see
-/// tools/trusted_signer.py for the reference signer - and sends back a
+/// tools/trusted_signer.js for the reference signer - and sends back a
 /// signature, which gets pasted into step 2 below. ReelLock never sees the
 /// trusted person's private key.
 class RecoveryScreen extends StatefulWidget {
@@ -88,69 +90,83 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Trusted-person recovery')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.m),
         children: [
           if (_resultMessage != null) ...[
-            Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Padding(padding: const EdgeInsets.all(16), child: Text(_resultMessage!)),
+            AppCard(
+              color: scheme.primaryContainer,
+              child: Text(_resultMessage!, style: TextStyle(color: scheme.onPrimaryContainer)),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.l),
             FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
           ] else if (_nonce == null) ...[
-            const Text('Step 1: describe what you need and why. Recovery is scoped to one specific action (need.md section 7) - it is never a blanket unlock.'),
-            const SizedBox(height: 12),
+            Text(
+              'Step 1: describe what you need and why. Recovery is scoped to one specific action - it is never a blanket unlock.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.m),
             DropdownButtonFormField<RecoveryAction>(
               initialValue: _action,
               decoration: const InputDecoration(labelText: 'Requested action'),
               items: RecoveryAction.values.map((a) => DropdownMenuItem(value: a, child: Text(a.label))).toList(),
               onChanged: (v) => setState(() => _action = v ?? RecoveryAction.unlockConfigEdit),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.m),
             TextField(
               controller: _reasonController,
-              decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Reason'),
               maxLines: 2,
             ),
-            const SizedBox(height: 20),
-            if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+            const SizedBox(height: AppSpacing.l),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                child: Text(_error!, style: TextStyle(color: scheme.error)),
+              ),
             FilledButton(onPressed: _busy ? null : _createRequest, child: const Text('Create recovery request')),
           ] else ...[
-            const Text('Step 2: send the challenge below to your trusted person. They sign it on their own device (tools/trusted_signer.py) and send back a signature.'),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Challenge', style: TextStyle(fontWeight: FontWeight.bold)),
-                    SelectableText(_challenge ?? '', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Copy'),
-                        onPressed: () => Clipboard.setData(ClipboardData(text: _challenge ?? '')),
-                      ),
+            Text(
+              'Step 2: send the challenge below to your trusted person. They sign it on their own device '
+              '(tools/trusted_signer.js) and send back a signature.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.m),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Challenge', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.xs),
+                  SelectableText(_challenge ?? '', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.copy_rounded),
+                      label: const Text('Copy'),
+                      onPressed: () => Clipboard.setData(ClipboardData(text: _challenge ?? '')),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            const Text('Once you have their signature (Base64), paste it here:'),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.l),
+            Text('Once you have their signature (Base64), paste it here:', style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: AppSpacing.s),
             TextField(
               controller: _signatureController,
               maxLines: 3,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'MEUCIQ...'),
+              decoration: const InputDecoration(hintText: 'MEUCIQ...'),
             ),
-            const SizedBox(height: 20),
-            if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+            const SizedBox(height: AppSpacing.l),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                child: Text(_error!, style: TextStyle(color: scheme.error)),
+              ),
             FilledButton(onPressed: _busy ? null : _submitApproval, child: const Text('Submit approval')),
           ],
         ],

@@ -21,6 +21,24 @@ enum EnforcementMode { accessibility, deviceManaged }
 
 enum RecoveryAction { unlockConfigEdit, extendAllowanceToday, resetCommitment }
 
+/// Mirrors android/.../classifier/AppSignatures.kt's TargetApp. YouTube's
+/// detection signatures are best-effort/uncalibrated on the native side (see
+/// that file) - picking it here just controls whether YouTube Shorts counts
+/// toward the shared budget at all, not how well it's detected yet.
+enum TargetApp { instagram, youtube }
+
+extension TargetAppInfo on TargetApp {
+  String get packageName => switch (this) {
+        TargetApp.instagram => 'com.instagram.android',
+        TargetApp.youtube => 'com.google.android.youtube',
+      };
+
+  String get displayName => switch (this) {
+        TargetApp.instagram => 'Instagram Reels',
+        TargetApp.youtube => 'YouTube Shorts',
+      };
+}
+
 extension RecoveryActionWire on RecoveryAction {
   String get wireName => switch (this) {
         RecoveryAction.unlockConfigEdit => 'UNLOCK_CONFIG_EDIT',
@@ -42,7 +60,7 @@ class CommitmentConfig {
   final int commitmentDays;
   final RecoveryMode recoveryMode;
   final EnforcementMode enforcementMode;
-  final String targetPackage;
+  final Set<String> monitoredApps;
   final bool blockUnknownScreens;
   final bool allowRecoveryDuringLock;
 
@@ -53,7 +71,7 @@ class CommitmentConfig {
     required this.commitmentDays,
     required this.recoveryMode,
     required this.enforcementMode,
-    required this.targetPackage,
+    required this.monitoredApps,
     required this.blockUnknownScreens,
     required this.allowRecoveryDuringLock,
   });
@@ -65,7 +83,7 @@ class CommitmentConfig {
     commitmentDays: 30,
     recoveryMode: RecoveryMode.trustedPerson,
     enforcementMode: EnforcementMode.accessibility,
-    targetPackage: 'com.instagram.android',
+    monitoredApps: {'com.instagram.android'},
     blockUnknownScreens: false,
     allowRecoveryDuringLock: true,
   );
@@ -79,7 +97,7 @@ class CommitmentConfig {
         enforcementMode: (map['enforcementMode'] as String) == 'DEVICE_MANAGED'
             ? EnforcementMode.deviceManaged
             : EnforcementMode.accessibility,
-        targetPackage: map['targetPackage'] as String,
+        monitoredApps: (map['monitoredApps'] as List?)?.map((e) => e as String).toSet() ?? {'com.instagram.android'},
         blockUnknownScreens: map['blockUnknownScreens'] as bool,
         allowRecoveryDuringLock: map['allowRecoveryDuringLock'] as bool,
       );
@@ -91,7 +109,7 @@ class CommitmentConfig {
         'commitmentDays': commitmentDays,
         'recoveryMode': 'TRUSTED_PERSON',
         'enforcementMode': enforcementMode == EnforcementMode.deviceManaged ? 'DEVICE_MANAGED' : 'ACCESSIBILITY',
-        'targetPackage': targetPackage,
+        'monitoredApps': monitoredApps.toList(),
         'blockUnknownScreens': blockUnknownScreens,
         'allowRecoveryDuringLock': allowRecoveryDuringLock,
       };
@@ -101,6 +119,7 @@ class CommitmentConfig {
     int? windowSeconds,
     int? commitmentDays,
     EnforcementMode? enforcementMode,
+    Set<String>? monitoredApps,
     bool? blockUnknownScreens,
   }) => CommitmentConfig(
         version: version,
@@ -109,7 +128,7 @@ class CommitmentConfig {
         commitmentDays: commitmentDays ?? this.commitmentDays,
         recoveryMode: recoveryMode,
         enforcementMode: enforcementMode ?? this.enforcementMode,
-        targetPackage: targetPackage,
+        monitoredApps: monitoredApps ?? this.monitoredApps,
         blockUnknownScreens: blockUnknownScreens ?? this.blockUnknownScreens,
         allowRecoveryDuringLock: allowRecoveryDuringLock,
       );

@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Requests only what InstagramAccessibilityService needs (need.md section 10:
+  Requests only what ReelLockAccessibilityService needs (need.md section 10:
   "request only the event types and window access it needs").
-  packageNames restricts delivery to Instagram so ReelLock never observes other apps.
+  packageNames restricts delivery to the apps ReelLock supports monitoring
+  (see classifier/AppSignatures.kt's TargetApp) so it never observes any
+  other app - whether each one is actually being enforced right now is a
+  separate, user-controlled choice (CommitmentConfig.monitoredApps).
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeWindowsChanged"
@@ -10,5 +13,5 @@
     android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:notificationTimeout="150"
-    android:packageNames="com.instagram.android"
+    android:packageNames="com.instagram.android,com.google.android.youtube"
     android:description="@string/accessibility_service_description" />

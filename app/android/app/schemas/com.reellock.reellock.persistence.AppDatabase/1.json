@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "e046144d082320e66c46e979e3ca0789",
+    "identityHash": "5536fe9761bb60ff33aeecf217553568",
     "entities": [
       {
         "tableName": "commitment_config",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`version` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reelsAllowanceSeconds` INTEGER NOT NULL, `windowSeconds` INTEGER NOT NULL, `commitmentDays` INTEGER NOT NULL, `recoveryMode` TEXT NOT NULL, `enforcementMode` TEXT NOT NULL, `targetPackage` TEXT NOT NULL, `blockUnknownScreens` INTEGER NOT NULL, `allowRecoveryDuringLock` INTEGER NOT NULL, `trustedPersonPublicKeyBase64` TEXT, `createdAtEpochMillis` INTEGER NOT NULL, `isDraft` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`version` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reelsAllowanceSeconds` INTEGER NOT NULL, `windowSeconds` INTEGER NOT NULL, `commitmentDays` INTEGER NOT NULL, `recoveryMode` TEXT NOT NULL, `enforcementMode` TEXT NOT NULL, `monitoredApps` TEXT NOT NULL, `blockUnknownScreens` INTEGER NOT NULL, `allowRecoveryDuringLock` INTEGER NOT NULL, `trustedPersonPublicKeyBase64` TEXT, `createdAtEpochMillis` INTEGER NOT NULL, `isDraft` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "version",
@@ -45,8 +45,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "targetPackage",
-            "columnName": "targetPackage",
+            "fieldPath": "monitoredApps",
+            "columnName": "monitoredApps",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -380,7 +380,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e046144d082320e66c46e979e3ca0789')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5536fe9761bb60ff33aeecf217553568')"
     ]
   }
 }
